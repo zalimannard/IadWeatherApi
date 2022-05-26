@@ -1,15 +1,25 @@
 package com.example.iadweatherapi;
 
+import static android.content.ContentValues.TAG;
+import static android.os.FileUtils.copy;
+
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.Image;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -19,10 +29,17 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
+import com.squareup.picasso.Picasso;
+import com.squareup.picasso.Target;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -31,9 +48,12 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -54,6 +74,7 @@ public class MainActivity extends AppCompatActivity
     private TextView pressure;
     private ImageView weatherLogo;
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
     @SuppressLint("MissingPermission")
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -75,20 +96,24 @@ public class MainActivity extends AppCompatActivity
         cities.get(0).setLongitude_(locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER).getLongitude());
 
         File fileo = new File(getExternalFilesDir(null), "mycities.txt");
-        try {
+        try
+        {
             File file = fileo;
             FileReader fr = new FileReader(file);
             BufferedReader reader = new BufferedReader(fr);
             String line = reader.readLine();
-            while (line != null) {
+            while (line != null)
+            {
                 String[] cityStr = line.split("_");
                 City city = new City(cityStr[0], Double.valueOf(cityStr[1]), Double.valueOf(cityStr[2]));
                 cities.add(city);
                 line = reader.readLine();
             }
-        } catch (FileNotFoundException e) {
+        } catch (FileNotFoundException e)
+        {
             e.printStackTrace();
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
         }
 
@@ -99,12 +124,11 @@ public class MainActivity extends AppCompatActivity
                 String.valueOf(cities.get(currentCity).getLongitude_()) +
                 "&appid=ed438edd3a5572a12570d7263cd69298&lang=ru&units=metric";
         new GetUrlData().execute(url);
-
-
     }
 
     private static float startX = 0;
     private static float startY = 0;
+
     @Override
     public boolean onTouchEvent(MotionEvent event)
     {
@@ -112,8 +136,7 @@ public class MainActivity extends AppCompatActivity
         {
             startX = event.getX();
             startY = event.getY();
-        }
-        else if (event.getAction() == 1)
+        } else if (event.getAction() == 1)
         {
             System.out.println();
             if (Math.abs(event.getX() - startX) > 300)
@@ -121,8 +144,7 @@ public class MainActivity extends AppCompatActivity
                 if (startX > event.getX())
                 {
                     currentCity = Math.min(cities.size() - 1, currentCity + 1);
-                }
-                else
+                } else
                 {
                     currentCity = Math.max(0, currentCity - 1);
                 }
@@ -170,12 +192,12 @@ public class MainActivity extends AppCompatActivity
         protected void onPreExecute()
         {
             super.onPreExecute();
-            city.setText("");
+//            city.setText("");
             isCurrentPlace.setText("");
-            weatherDescription.setText("");
-            temperature.setText("");
-            pressure.setText("");
-            humidity.setText("");
+//            weatherDescription.setText("");
+//            temperature.setText("");
+//            pressure.setText("");
+//            humidity.setText("");
         }
 
         @Override
@@ -236,15 +258,16 @@ public class MainActivity extends AppCompatActivity
                 if (currentCity == 0)
                 {
                     isCurrentPlace.setText("Текущее местоположение");
-                }
-                else
+                } else
                 {
                     isCurrentPlace.setText("");
                 }
-
-                String icon = StringFormatter.reverseString(obj.getJSONArray("weather").getJSONObject(0).getString("icon"));
+                String imageName = obj.getJSONArray("weather").getJSONObject(0).getString("icon");
                 Context context = weatherLogo.getContext();
-                weatherLogo.setImageResource(context.getResources().getIdentifier(icon, "drawable", context.getPackageName()));
+
+                Glide.with(context)
+                        .load("https://openweathermap.org/img/wn/" + imageName + "@4x.png")
+                        .into(weatherLogo);
 
                 weatherDescription.setText(obj.getJSONArray("weather").getJSONObject(0).getString("description"));
                 temperature.setText("Температура: " + obj.getJSONObject("main").getDouble("temp") + "°C");
@@ -252,18 +275,7 @@ public class MainActivity extends AppCompatActivity
                 pressure.setText("Давление атм: " + obj.getJSONObject("main").getDouble("pressure") + " мм. рт. ст.");
             } catch (JSONException e)
             {
-                e.printStackTrace();
             }
-        }
-    }
-
-    public static class StringFormatter
-    {
-        public static String reverseString(String str)
-        {
-            StringBuilder sb = new StringBuilder(str);
-            sb.reverse();
-            return sb.toString();
         }
     }
 
